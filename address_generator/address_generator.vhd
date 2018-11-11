@@ -22,7 +22,8 @@ entity address_generator is
 end entity;
 
 architecture behavioral of address_generator is
-    type state is (STATE_IDLE, STATE_HOLD_ADDR, STATE_INC_ADDR);
+    -- type state is (STATE_IDLE, STATE_HOLD_ADDR, STATE_INC_ADDR);
+    type state is (STATE_IDLE, STATE_HOLD_ADDR);
     signal int_state : state;
 
     signal hold_cnt : unsigned(2 downto 0);
@@ -55,18 +56,26 @@ begin
                             hold_cnt <= hold_cnt + 1;
                         else
                             hold_cnt <= (others => '0');
-                            int_state <= STATE_INC_ADDR;
+                            -- int_state <= STATE_INC_ADDR;
+                            if (word_cnt < unsigned(num_words_reg)-1) then
+                                int_addr <= std_logic_vector(unsigned(int_addr) + to_unsigned(WORD_WIDTH, int_addr'length));
+                                word_cnt <= word_cnt + 1;
+                                int_state <= STATE_HOLD_ADDR;
+                            else
+                                word_cnt <= (others => '0');
+                                int_state <= STATE_IDLE;
+                            end if;
                         end if;
 
-                    when STATE_INC_ADDR =>
-                        if (word_cnt < unsigned(num_words_reg)) then
-                            int_addr <= std_logic_vector(unsigned(int_addr) + to_unsigned(WORD_WIDTH, int_addr'length));
-                            word_cnt <= word_cnt + 1;
-                            int_state <= STATE_HOLD_ADDR;
-                        else
-                            word_cnt <= (others => '0');
-                            int_state <= STATE_IDLE;
-                        end if;
+                    -- when STATE_INC_ADDR =>
+                    --     if (word_cnt < unsigned(num_words_reg)) then
+                    --         int_addr <= std_logic_vector(unsigned(int_addr) + to_unsigned(WORD_WIDTH, int_addr'length));
+                    --         word_cnt <= word_cnt + 1;
+                    --         int_state <= STATE_HOLD_ADDR;
+                    --     else
+                    --         word_cnt <= (others => '0');
+                    --         int_state <= STATE_IDLE;
+                    --     end if;
 
                 end case;
             end if;

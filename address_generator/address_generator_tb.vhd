@@ -57,18 +57,21 @@ begin
                 start_addr <= std_logic_vector(to_unsigned(test_start_addr, ADDR_WIDTH));
                 num_words <= std_logic_vector(to_unsigned(test_num_words, ADDR_WIDTH));
                 enable <= '1';
-                wait until rising_edge(clk);
-                wait for 0 ns;
-                enable <= '0';
-                for expected_words in 0 to test_num_words loop
+                for expected_words in 0 to test_num_words-1 loop
                     -- Wait for generator to output data
-                    for i in 0 to CYCLES_PER_ADDR loop
+                    for i in 0 to CYCLES_PER_ADDR-1 loop
                         wait until rising_edge(clk);
-                        wait for 0 ns;
+                        enable <= '0';
                     end loop;
+
+                    wait for 1 ns;
                     assert (out_addr = std_logic_vector(to_unsigned(test_start_addr + expected_words*4, ADDR_WIDTH)))
-                            report "Bad address" severity error;
+                            report "Bad address, word: " & integer'image(expected_words) & " Got: " & integer'image(to_integer(unsigned(out_addr))) severity error;
                 end loop;
+
+                -- Wait some time in between runs
+                wait until rising_edge(clk);
+                wait until rising_edge(clk);
             end loop;
         end loop;
 
