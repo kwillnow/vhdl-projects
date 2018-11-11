@@ -8,17 +8,18 @@ end entity;
 architecture testbench of address_generator_tb is
     constant ADDR_WIDTH : positive := 32;
     constant WORD_WIDTH : positive := 4;
-    constant CYCLES_PER_ADDR : positive := 1;
 
     constant TEST_RANGE : integer := 65536;
 
     signal clk : std_logic := '0';
     signal rst : std_logic := '0';
 
-    signal enable : std_logic := '0';
+    signal go : std_logic := '0';
+    signal rdy : std_logic := '0';
 
     signal start_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
     signal num_words : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
+    signal addr_valid : std_logic;
     signal out_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
 
     signal sim_done : std_logic := '0';
@@ -26,15 +27,16 @@ begin
     UUT : entity work.address_generator
         generic map (
             ADDR_WIDTH => ADDR_WIDTH,
-            WORD_WIDTH => WORD_WIDTH,
-            CYCLES_PER_ADDR => CYCLES_PER_ADDR
+            WORD_WIDTH => WORD_WIDTH
         )
         port map (
             clk => clk,
             rst => rst,
-            enable => enable,
+            go => go,
+            rdy => rdy,
             start_addr => start_addr,
             num_words => num_words,
+            addr_valid => addr_valid,
             out_addr => out_addr
         );
 
@@ -49,30 +51,23 @@ begin
         rst <= '0';
         wait until rising_edge(clk);
         wait for 0 ns;
-        assert (out_addr = std_logic_vector(to_unsigned(0, ADDR_WIDTH))) report "Reset failed" severity error;
+        assert (addr_valid = '0') report "Reset failed, addr_valid non-zero" severity error;
+        assert (out_addr = std_logic_vector(to_unsigned(0, ADDR_WIDTH))) report "Reset failed, out_addr non-zero" severity error;
 
-        -- Test various values
-        for test_start_addr in 0 to TEST_RANGE loop
-            for test_num_words in 1 to TEST_RANGE loop
-                start_addr <= std_logic_vector(to_unsigned(test_start_addr, ADDR_WIDTH));
-                num_words <= std_logic_vector(to_unsigned(test_num_words, ADDR_WIDTH));
-                enable <= '1';
-                for expected_words in 0 to test_num_words-1 loop
-                    -- Wait for generator to output data
-                    for i in 0 to CYCLES_PER_ADDR-1 loop
-                        wait until rising_edge(clk);
-                        enable <= '0';
-                    end loop;
+        -- Test reading a stream without pause
+        start_addr <= (others => '0');
+        num_words <= std_logic_vector(to_unsigned(TEST_RANGE, ADDR_WIDTH));
+        rdy <= '1';
+        go <= '1';
+        for i in 0 to TEST_RANGE-1 loop
 
-                    wait for 1 ns;
-                    assert (out_addr = std_logic_vector(to_unsigned(test_start_addr + expected_words*4, ADDR_WIDTH)))
-                            report "Bad address, word: " & integer'image(expected_words) & " Got: " & integer'image(to_integer(unsigned(out_addr))) severity error;
-                end loop;
-
-                -- Wait some time in between runs
-                wait until rising_edge(clk);
-                wait until rising_edge(clk);
-            end loop;
+            wait until rising_edge(clk);
+            wait for 1 ns;
+            go <= '0';
+            assert (addr_valid = '1') report "Address not valid!" severity error;
+            assert (unsigned(out_addr) = unsigned(start_addr) + to_unsigned(i*4, ADDR_WIDTH))
+                    report "Address incorrect! Expected " & integer'image(to_integer(unsigned(start_addr) +
+                    to_unsigned(i*4, ADDR_WIDTH))) severity error;
         end loop;
 
         report "All tests passed";
